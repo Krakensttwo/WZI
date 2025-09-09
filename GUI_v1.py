@@ -231,35 +231,6 @@ def update_texture_z(sender, app_data):
         else:
             dpg.set_value("dicom_texture_z", z_texture_data)
 
-def shear_volume_with_tilt(
-    stack: np.ndarray,
-    gantry_tilt: float,
-    pixel_spacing_z: float,
-    pixel_spacing_x: float
-) -> np.ndarray:
-    """
-    Przesuwa dane w wolumenie (Z, Y, X) zgodnie z gantry tilt.
-    Górna połowa w lewo, dolna w prawo. Puste miejsca = 0.
-    """
-    Z, Y, X = stack.shape
-    out = np.zeros_like(stack)
-
-    # przesunięcie w pikselach na jednostkę "wysokości"
-    offset_per_row = math.sin(math.radians(gantry_tilt)) * (pixel_spacing_z / pixel_spacing_x)
-    center_y = Y // 2
-
-    for y in range(Y):
-        rel = (y - center_y)  # odległość od środka wiersza
-        shift = int(round(rel * offset_per_row))
-
-        if shift < 0:  # w lewo
-            out[:, y, :X+shift] = stack[:, y, -shift:]
-        elif shift > 0:  # w prawo
-            out[:, y, shift:] = stack[:, y, :X-shift]
-        else:
-            out[:, y, :] = stack[:, y, :]
-
-    return out
 
 def update_texture_x(sender, app_data):
     if dpg.get_value("animation_checkbox"):
@@ -272,25 +243,10 @@ def update_texture_x(sender, app_data):
                 )
             case "Average":
                 stack = np.stack([sl.pixel_data for sl in slices], axis=0)
-                print(stack.shape)
-                sheared = shear_volume_with_tilt(
-                    stack,
-                    gantry_tilt=gantry_tilt,
-                    pixel_spacing_z=pixel_spacing_z,
-                    pixel_spacing_x=pixel_spacing_x
-                )
-                x_projection = np.mean(sheared, axis=2)
+                x_projection = np.mean(stack, axis=2)
             case "Maximum":
                 stack = np.stack([sl.pixel_data for sl in slices], axis=0)
-                sheared = shear_volume_with_tilt(
-                    stack,
-                    gantry_tilt=gantry_tilt,
-                    pixel_spacing_z=pixel_spacing_z,
-                    pixel_spacing_x=pixel_spacing_x
-                )
-                
                 x_projection = np.max(stack, axis=2)
-
             case "First Hit":
                 stack = np.stack([s.pixel_data for s in slices], axis=0)
                 threshold = dpg.get_value("first_hit_slider")
